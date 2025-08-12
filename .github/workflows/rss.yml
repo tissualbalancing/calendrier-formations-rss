@@ -3,7 +3,7 @@ name: Build RSS
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *" # toutes les heures
+    - cron: "0 * * * *" # run every hour
 
 jobs:
   build:
@@ -24,5 +24,12 @@ jobs:
       - name: Build RSS
         run: npm run build
 
-      - name: Deploy
-        run: npm run deploy
+      - name: Commit and push RSS
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto-update RSS feed" || echo "No changes to commit"
+          git push
+          Update rss.yml workflow
+
