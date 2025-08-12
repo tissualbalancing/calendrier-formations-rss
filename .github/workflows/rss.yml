@@ -1,0 +1,28 @@
+name: Build RSS
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" # toutes les heures
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build RSS
+        run: npm run build
+
+      - name: Deploy
+        run: npm run deploy
