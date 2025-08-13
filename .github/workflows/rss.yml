@@ -29,12 +29,22 @@ jobs:
           RSS_DESCRIPTION: ${{ vars.RSS_DESCRIPTION }}
           RSS_LIMIT: ${{ vars.RSS_LIMIT }}
           RSS_OUTPUT: docs/rss.xml
-        run: npm run build
+        run: |
+          npm run build
+          echo "--- AFTER BUILD ---"
+          if [ -f docs/rss.xml ]; then
+            echo "rss.xml exists ✓"
+            wc -c docs/rss.xml || true
+            head -n 30 docs/rss.xml || true
+          else
+            echo "rss.xml NOT FOUND ✗"
+          fi
 
       - name: Commit rss.xml
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/rss.xml
+          git status
           git commit -m "chore: update rss.xml [skip ci]" || echo "No changes"
-          git push
+          git push || true
