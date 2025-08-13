@@ -23,31 +23,21 @@ jobs:
 
       - name: Build RSS
         env:
-          SOURCE_URL: ${{ secrets.SOURCE_URL }}   # <- utilise le secret
-          SITE_URL: ${{ vars.SITE_URL }}
-          RSS_TITLE: ${{ vars.RSS_TITLE }}
+          SOURCE_URL: ${{ secrets.SOURCE_URL }}
+          SITE_URL:   ${{ vars.SITE_URL }}
+          RSS_TITLE:  ${{ vars.RSS_TITLE }}
           RSS_DESCRIPTION: ${{ vars.RSS_DESCRIPTION }}
-          RSS_LIMIT: ${{ vars.RSS_LIMIT }}
+          RSS_LIMIT:  ${{ vars.RSS_LIMIT }}
           RSS_OUTPUT: docs/rss.xml
         run: |
-          set -e
           echo "➡️ Will fetch: $SOURCE_URL"
-          curl -s -H "Accept: application/json" "$SOURCE_URL" | head -c 300 || true
-          echo
+          curl -sS "$SOURCE_URL" | head -c 200 || true
           npm run build
-          echo "--- AFTER BUILD ---"
-          if [ -f docs/rss.xml ]; then
-            echo "rss.xml exists ✓"
-            wc -c docs/rss.xml || true
-            head -n 30 docs/rss.xml || true
-          else
-            echo "rss.xml NOT FOUND ✗"
-            exit 1
-          fi
+          test -f docs/rss.xml || (echo "rss.xml NOT FOUND" && exit 1)
 
       - name: Commit rss.xml
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/rss.xml
           git commit -m "chore: update rss.xml [skip ci]" || echo "No changes"
