@@ -1,176 +1,88 @@
-// src/buildRss.js
+import fs from 'fs';
+import path from 'path';
 import fetch from 'node-fetch';
 import { create } from 'xmlbuilder2';
-import dayjs from 'dayjs';
 
-// ====== ENV ======
-const SOURCE_URL = process.env.SOURCE_URL;                // secret
-const SITE_URL   = process.env.SITE_URL || 'https://www.tissual-balancing.com';
-const FEED_TITLE = process.env.RSS_TITLE || 'Tissual Balancing® – Formations';
-const FEED_DESC  = process.env.RSS_DESCRIPTION || 'Flux des formations (CMS).';
-const LIMIT      = parseInt(process.env.RSS_LIMIT || '10', 10);
-const OUTPUT     = process.env.RSS_OUTPUT || 'docs/rss.xml';
+const SOURCE_URL = process.env.SOURCE_URL || 'https://www.tissual-balancing.com/_functions/rssData?limit=3';
+const OUTPUT_PATH = path.join('docs', 'rss.xml');
 
-// ====== helpers ======
+// Convertit wix:image:// → URL HTTP
 function toHttpFromWixImage(url) {
-  // Transforme: wix:image://v1/3d487b_xxx~mv2.avif/Name.avif#originWidth...
-  // en:         https://static.wixstatic.com/media/3d487b_xxx~mv2.avif
   if (!url || typeof url !== 'string') return undefined;
-  const m = url.match(/^wix:image:\/\/v\d\/([^/]+)\//); // capture "3d487b_xxx~mv2.avif"
+  const m = url.match(/^wix:image:\/\/v\d\/([^/]+)\//);
   if (m) return `https://static.wixstatic.com/media/${m[1]}`;
-  return url; // si c’est déjà http(s)
+  return url;
 }
 
-function parseDateStartFromText(txt) {
-  if (!txt) return undefined;
-  const s = String(txt);
-
-  // Cas "du 08/09 au 19/09/2025" -> start = 2025-09-08
-  let m = s.match(/du\s+(\d{1,2})[\/\.](\d{1,2})\s+au\s+(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})/i);
-  if (m) {
-    const [, d1, mo1, , , y] = m;
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${y}-${pad(mo1)}-${pad(d1)}`;
-  }
-
-  // yyyy-mm-dd quelque part
-  m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (m) return m[0];
-
-  // dd/mm/yyyy
-  m = s.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-  if (m) {
-    const [, d, mo, y] = m;
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${y}-${pad(mo)}-${pad(d)}`;
-  }
-
-  // dd/mm (sans année) -> prend année courante
-  m = s.match(/\b(\d{1,2})\/(\d{1,2})\b/);
-  if (m) {
-    const [, d, mo] = m;
-    const y = String(new Date().getFullYear());
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${y}-${pad(mo)}-${pad(d)}`;
-  }
-
-  return undefined;
+// Détecte le type MIME en fonction de l'extension
+function guessMimeFromUrl(url) {
+  if (!url) return 'image/*';
+  const u = url.toLowerCase();
+  if (u.endsWith('.jpg') || u.endsWith('.jpeg')) return 'image/jpeg';
+  if (u.endsWith('.png')) return 'image/png';
+  if (u.endsWith('.webp')) return 'image/webp';
+  if (u.endsWith('.avif')) return 'image/avif';
+  return 'image/*';
 }
 
-function buildItemDescription(it) {
-  if (it.rssHtml && typeof it.rssHtml === 'string' && it.rssHtml.trim()) {
-    // on fait confiance à ton HTML personnalisé
-    return it.rssHtml;
-  }
-  // fallback : tableau propre
-  const rows = [
-    ['Lieu & dates', it.lieuEtDate],
-    ['Durée', it.nbJours],
-    ['Prix', it.prix]
-  ].filter(([, v]) => v);
-
-  const trs = rows
-    .map(
-      ([k, v]) =>
-        `<tr><th style="text-align:left;padding:4px 8px;">${k}</th><td style="padding:4px 8px;">${String(
-          v
-        ).replace(/</g, '&lt;')}</td></tr>`
-    )
-    .join('\n');
-
-  return `<table>${trs}</table>`;
-}
-
-// ====== main ======
 async function main() {
-  if (!SOURCE_URL) {
-    console.error('❌ SOURCE_URL manquant (Settings → Secrets → Actions).');
-    process.exit(1);
-  }
-
-  console.log(`➡️ Fetch: ${SOURCE_URL}`);
-  const res = await fetch(SOURCE_URL, { timeout: 20000 });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText}`);
-  }
+  console.log('Fetching data from', SOURCE_URL);
+  const res = await fetch(SOURCE_URL);
+  if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
   const json = await res.json();
-  const srcItems = Array.isArray(json.items) ? json.items : [];
 
-  if (!srcItems.length) {
-    console.warn('⚠️ Aucune formation reçue. Écriture d’un flux minimal.');
-  }
+  const items = json.items || [];
+  console.log(`Got ${items.length} items`);
 
-  // mapping exact des champs Wix (d’après ton debug)
-  const items = srcItems
-    .filter((it) => it && it.title) // simple garde-fou
-    .map((it) => {
-      const title = it.title || 'Formation';
-      const link = it.link || it.lien || SITE_URL;
-      const image = toHttpFromWixImage(it.image || it.nouveauChamp);
-      const prix = it.prix;
-      const lieuEtDate = it.lieuEtDate || it.dates;
-      const nbJours = it.nbJours || it.nbDeJoursheures;
-      const rssHtml = it.rssHtml;
-      const dateStart = parseDateStartFromText(lieuEtDate) || it.dateStart;
+  const limit = parseInt((SOURCE_URL.match(/limit=(\d+)/) || [])[1] || items.length, 10);
+  const limitedItems = items.slice(0, limit);
 
-      return {
-        title,
-        link,
-        guid: link,
-        dateStart,
-        description: buildItemDescription({ rssHtml, lieuEtDate, nbJours, prix }),
-        enclosure: image
-      };
-    })
-    // tri ascendant sur dateStart si dispo
-    .sort((a, b) => {
-      const ta = a.dateStart ? +new Date(a.dateStart) : Infinity;
-      const tb = b.dateStart ? +new Date(b.dateStart) : Infinity;
-      return ta - tb;
-    })
-    .slice(0, LIMIT);
-
-  // Construction RSS 2.0
-  const root = create({ version: '1.0', encoding: 'UTF-8' })
+  const feed = create({ version: '1.0', encoding: 'UTF-8' })
     .ele('rss', { version: '2.0' })
     .ele('channel')
-    .ele('title').txt(FEED_TITLE).up()
-    .ele('link').txt(SITE_URL).up()
-    .ele('description').txt(FEED_DESC).up()
+    .ele('title').txt('Tissual Balancing® – Formations').up()
+    .ele('link').txt('https://www.tissual-balancing.com').up()
+    .ele('description').txt('Flux des formations (CMS).').up()
     .ele('language').txt('fr-FR').up();
 
-  for (const it of items) {
-    const pubDate =
-      it.dateStart ? dayjs(it.dateStart).toDate().toUTCString() : new Date().toUTCString();
+  for (const it of limitedItems) {
+    const title = it.title || '';
+    const link = it.link || it.lien || '';
+    const guid = link;
+    const pubDate = it.dates || ''; // On prend directement le champ dates sans extraction
+    const image = toHttpFromWixImage(it.image || it.nouveauChamp);
+    const prix = it.prix || '';
+    const lieuEtDate = it.lieuEtDate || it.dates || '';
+    const nbJours = it.nbJours || it.nbDeJoursheures || '';
+    const complet = it.complet ? 'oui' : 'non';
 
-    const item = root.ele('item');
-    item.ele('title').txt(it.title).up();
-    item.ele('link').txt(it.link).up();
-    item.ele('guid').txt(it.guid).up();
+    const descriptionHtml = `
+      <table>
+        <tr><th style="text-align:left;padding:4px 8px;">lieu/date</th><td style="padding:4px 8px;">${lieuEtDate}</td></tr>
+        <tr><th style="text-align:left;padding:4px 8px;">jours/heures</th><td style="padding:4px 8px;">${nbJours}</td></tr>
+        <tr><th style="text-align:left;padding:4px 8px;">prix</th><td style="padding:4px 8px;">${prix}</td></tr>
+        <tr><th style="text-align:left;padding:4px 8px;">complet</th><td style="padding:4px 8px;">${complet}</td></tr>
+      </table>
+    `.trim();
+
+    const item = feed.ele('item');
+    item.ele('title').txt(title).up();
+    item.ele('link').txt(link).up();
+    item.ele('guid').txt(guid).up();
     item.ele('pubDate').txt(pubDate).up();
-    item.ele('description').txt(it.description).up();
+    item.ele('description').dat(descriptionHtml).up();
 
-    if (it.enclosure) {
-      item
-        .ele('enclosure', {
-          url: it.enclosure,
-          type: 'image/*'
-        })
-        .up();
+    if (image) {
+      item.ele('enclosure', { url: image, type: guessMimeFromUrl(image) }).up();
     }
   }
 
-  const xml = root.end({ prettyPrint: true });
-
-  // write file
-  import('fs').then(({ writeFileSync, mkdirSync }) => {
-    mkdirSync(OUTPUT.split('/').slice(0, -1).join('/'), { recursive: true });
-    writeFileSync(OUTPUT, xml, 'utf8');
-    console.log(`✅ RSS écrit → ${OUTPUT}`);
-  });
+  const xml = feed.end({ prettyPrint: true });
+  fs.writeFileSync(OUTPUT_PATH, xml, 'utf8');
+  console.log('RSS feed written to', OUTPUT_PATH);
 }
 
-main().catch((e) => {
-  console.error('❌ Build failed:', e);
+main().catch(err => {
+  console.error(err);
   process.exit(1);
 });
