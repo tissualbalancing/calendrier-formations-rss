@@ -30,6 +30,10 @@ jobs:
           RSS_LIMIT: ${{ vars.RSS_LIMIT }}
           RSS_OUTPUT: docs/rss.xml
         run: |
+          # petit debug convivial
+          echo "➡️ Will fetch: $SOURCE_URL"
+          curl -s "$SOURCE_URL" | head -c 300 || true
+          echo
           npm run build
           echo "--- AFTER BUILD ---"
           if [ -f docs/rss.xml ]; then
@@ -38,6 +42,7 @@ jobs:
             head -n 30 docs/rss.xml || true
           else
             echo "rss.xml NOT FOUND ✗"
+            exit 1
           fi
 
       - name: Commit rss.xml
