@@ -5,5 +5,14 @@
     <link>https://www.tissual-balancing.com</link>
     <description>Flux des formations (CMS).</description>
     <language>fr-FR</language>
+    <item>
+      <title>Flux indisponible</title>
+      <link>https://www.tissual-balancing.com</link>
+      <guid>https://www.tissual-balancing.com</guid>
+      <pubDate>Wed, 13 Aug 2025 21:15:07 GMT</pubDate>
+      <description>&lt;table&gt;&lt;tr&gt;&lt;th style="text-align:left;padding:4px 8px;"&gt;title&lt;/th&gt;&lt;td style="padding:4px 8px;"&gt;Flux indisponible&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th style="text-align:left;padding:4px 8px;"&gt;note&lt;/th&gt;&lt;td style="padding:4px 8px;"&gt;Erreur: HTTP 404&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;th style="text-align:left;padding:4px 8px;"&gt;dateStart&lt;/th&gt;&lt;td style="padding:4px 8px;"&gt;2025-08-13T21:15:07.826Z&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</description>
+    </item>
   </channel>
 </rss>
