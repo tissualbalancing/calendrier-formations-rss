@@ -12,22 +12,29 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+  - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+  - uses: actions/setup-node@v4
+    with:
+      node-version: '20'
 
-      - name: Install deps
-        run: npm ci || npm install
+  - name: Install deps
+    run: npm ci || npm install
 
-      - name: Build RSS
-        run: npm run build
+  - name: Build RSS
+    env:
+      SOURCE_URL: ${{ secrets.SOURCE_URL }}
+      SITE_URL: ${{ vars.SITE_URL }}
+      RSS_OUTPUT: docs/rss.xml
+      RSS_LIMIT: 3
+      RSS_TITLE: Tissual Balancing® – Formations
+      RSS_DESCRIPTION: Flux des formations (CMS)
+    run: npm run build
 
-      - name: Commit rss.xml
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/rss.xml
-          git commit -m "chore: update rss.xml [skip ci]" || echo "No changes"
-          git push
+  - name: Commit rss.xml
+    run: |
+      git config user.name "github-actions[bot]"
+      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      git add docs/rss.xml
+      git commit -m "chore: update rss.xml [skip ci]" || echo "No changes"
+      git push
