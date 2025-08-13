@@ -23,16 +23,16 @@ jobs:
 
       - name: Build RSS
         env:
-          SOURCE_URL: https://raw.githubusercontent.com/tissualbalancing/calendrier-formations-rss/main/public/mock.json
+          SOURCE_URL: ${{ secrets.SOURCE_URL }}   # <- utilise le secret
           SITE_URL: ${{ vars.SITE_URL }}
           RSS_TITLE: ${{ vars.RSS_TITLE }}
           RSS_DESCRIPTION: ${{ vars.RSS_DESCRIPTION }}
           RSS_LIMIT: ${{ vars.RSS_LIMIT }}
           RSS_OUTPUT: docs/rss.xml
         run: |
-          # petit debug convivial
+          set -e
           echo "➡️ Will fetch: $SOURCE_URL"
-          curl -s "$SOURCE_URL" | head -c 300 || true
+          curl -s -H "Accept: application/json" "$SOURCE_URL" | head -c 300 || true
           echo
           npm run build
           echo "--- AFTER BUILD ---"
