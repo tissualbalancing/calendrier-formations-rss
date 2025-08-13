@@ -25,10 +25,10 @@ jobs:
         env:
           SOURCE_URL: ${{ secrets.SOURCE_URL }}
           SITE_URL: ${{ vars.SITE_URL }}
+          RSS_TITLE: ${{ vars.RSS_TITLE }}
+          RSS_DESCRIPTION: ${{ vars.RSS_DESCRIPTION }}
+          RSS_LIMIT: ${{ vars.RSS_LIMIT }}
           RSS_OUTPUT: docs/rss.xml
-          RSS_LIMIT: 3
-          RSS_TITLE: Tissual Balancing® – Formations
-          RSS_DESCRIPTION: Flux des formations (CMS)
         run: npm run build
 
       - name: Commit rss.xml
