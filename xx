@@ -1,1 +1,30 @@
-xx
+[
+  {
+    "title": "Fasciathérapie – Principes fondamentaux",
+    "link": "https://www.tissual-balancing.com/formations/fascia-1",
+    "dateStart": "2025-09-20T09:00:00Z",
+    "lieu": "Montpellier",
+    "prix": "390€",
+    "image": "https://via.placeholder.com/800x450",
+    "tags": ["Fascia 1","Débutant"]
+  },
+  {
+    "title": "Fasciathérapie – Approfondissement",
+    "link": "https://www.tissual-balancing.com/formations/fascia-2",
+    "dateStart": "2025-10-18T09:00:00Z",
+    "lieu": "Aix-en-Provence",
+    "prix": "420€",
+    "image": "https://via.placeholder.com/800x450",
+    "tags": ["Fascia 2","Intermédiaire"]
+  },
+  {
+    "title": "Bilan postural selon la fasciathérapie",
+    "link": "https://www.tissual-balancing.com/formations/bilan-postural",
+    "dateStart": "2025-11-15T09:00:00Z",
+    "lieu": "Montpellier",
+    "prix": "290€",
+    "image": "https://via.placeholder.com/800x450",
+    "tags": ["Posturologie"]
+  ]
+]
+
