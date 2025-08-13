@@ -2,19 +2,20 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { create } from 'xmlbuilder2';
 
-// -------- CONFIG --------
-const SOURCE_URL = process.env.SOURCE_URL; // on la met en secret GitHub
-const OUTPUT = 'docs/rss.xml';             // GitHub Pages servira /docs
-const FEED_TITLE = 'Tissual Balancing® – Formations';
-const FEED_LINK = process.env.SITE_URL || 'https://www.tissual-balancing.com';
-const FEED_DESC = 'Flux des 3 prochaines formations (ordre d’apparition).';
-const LIMIT = 3;
+// ===== CONFIG =====
+const SOURCE_URL = process.env.SOURCE_URL;                 // secret Actions
+const OUTPUT = process.env.RSS_OUTPUT || 'docs/rss.xml';   // rss.yml pousse vers /docs
+const FEED_TITLE = process.env.RSS_TITLE || 'Tissual Balancing® – Formations';
+const FEED_LINK  = process.env.SITE_URL  || 'https://www.tissual-balancing.com';
+const FEED_DESC  = process.env.RSS_DESCRIPTION || 'Flux des 3 prochaines formations (ordre d’apparition).';
+const LIMIT = parseInt(process.env.RSS_LIMIT || '3', 10);
 
 if (!SOURCE_URL) {
-  console.error('❌ SOURCE_URL manquant (secret Actions).');
+  console.error('❌ SOURCE_URL manquant (Settings → Secrets → Actions).');
   process.exit(1);
 }
 
+// Construit un RSS 2.0 simple
 function buildRSS(items) {
   const root = create({ version: '1.0', encoding: 'UTF-8' })
     .ele('rss', { version: '2.0' })
@@ -36,30 +37,57 @@ function buildRSS(items) {
   return root.end({ prettyPrint: true });
 }
 
-function extractItemsFromHTML(html, baseUrl) {
+// Détection robuste sur une page Wix : on garde l'ordre du DOM (= ordre d’apparition)
+function extractItemsFromHTML(html) {
   const $ = cheerio.load(html);
 
-  // 1) Essaie un sélecteur “galerie/slide” courant sur Wix
-  let cards = $('.gallery-slide, .course-card, .training-card, article');
+  // On cible d'abord des “cartes” possibles
+  let blocks = $('.gallery-slide, .course-card, .training-card, [role="listitem"], article');
 
-  // Si rien trouvé, prends simplement les 3 premiers liens significatifs
-  if (cards.length === 0) {
-    cards = $('a:has(img), a:has(h1), a:has(h2), a:has(h3)');
+  // Si rien de concluant, on tombera sur des <a> pertinents
+  if (blocks.length === 0) {
+    blocks = $('a[href]');
   }
 
-  const items = [];
-  cards.each((_, el) => {
-    const node = $(el);
-    const title = node.find('h1,h2,h3,.title,.card-title').first().text().trim()
-      || node.attr('aria-label') || node.text().trim().slice(0, 120);
-    let href = node.find('a').first().attr('href') || '';
-    if (href && !href.startsWith('http')) {
-      href = FEED_LINK.replace(/\/$/, '') + '/' + href.replace(/^\//, '');
-    }
-    const img = node.find('img').first().attr('src') || null;
-    const excerpt = node.find('p,.excerpt,.summary').first().text().trim();
+  const makeAbsolute = (href) => {
+    if (!href) return '';
+    if (href.startsWith('http')) return href;
+    return FEED_LINK.replace(/\/$/, '') + '/' + href.replace(/^\//, '');
+  };
 
-    if (title) items.push({ title, url: href || baseUrl, image: img, excerpt });
+  const items = [];
+  const seen = new Set();
+
+  // Itération dans l’ordre du DOM => garde l’ordre d’apparition
+  blocks.each((_, el) => {
+    const node = $(el);
+
+    // 1) Trouver un lien pertinent (priorité aux liens “formations”)
+    let a = node.is('a') ? node : node.find('a').first();
+    let href = a.attr('href') || '';
+    if (!href || href.startsWith('#')) return;
+    const abs = makeAbsolute(href);
+
+    // Filtrer un peu pour éviter les liens hors-sujet ; garde large mais utile
+    const keep = /formations|massage|therap/i.test(abs);
+    if (!keep) return;
+
+    if (seen.has(abs)) return; // pas de doublon
+    seen.add(abs);
+
+    // 2) Récupérer un titre lisible (heading proche > aria-label > texte du lien)
+    const title =
+      node.find('h1,h2,h3,.title,.card-title').first().text().trim() ||
+      a.attr('aria-label') ||
+      a.text().trim();
+
+    if (!title) return;
+
+    // 3) Image et extrait optionnels
+    const img = (node.find('img').first().attr('src') || a.find('img').first().attr('src')) || null;
+    const excerpt = node.find('p,.excerpt,.summary').first().text().trim() || '';
+
+    items.push({ title, url: abs, image: img, excerpt });
   });
 
   return items;
@@ -69,10 +97,20 @@ const fs = await import('fs');
 const path = await import('path');
 
 (async () => {
+  console.log('➡️ Fetch:', SOURCE_URL);
   const res = await fetch(SOURCE_URL, { headers: { 'accept': 'text/html' } });
-  const html = await res.text();
+  if (!res.ok) {
+    console.error('❌ Fetch error:', res.status, await res.text().catch(()=> ''));
+    process.exit(1);
+  }
 
-  const items = extractItemsFromHTML(html, SOURCE_URL).slice(0, LIMIT);
+  const html = await res.text();
+  const items = extractItemsFromHTML(html);
+
+  if (!items.length) {
+    console.warn('⚠️ Aucun élément détecté. Vérifie les sélecteurs ou la page.');
+  }
+
   const xml = buildRSS(items);
 
   const outPath = path.resolve(OUTPUT);
